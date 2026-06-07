@@ -1,0 +1,639 @@
+# Workflow 10 — AI Email Auto Responder
+## AI Automation Freelancer Training — June 2026
+
+---
+
+## What This Workflow Does
+
+Someone sends an email to a business Gmail account.
+n8n catches it within 1 minute.
+AI reads the email and understands what the person wants.
+AI writes a professional human-sounding reply automatically.
+The reply gets sent back to the sender instantly.
+Everything gets logged to Google Sheets for tracking.
+The business owner never has to touch routine emails again.
+
+---
+
+## Tools I Used
+
+```
+Gmail         → Catch incoming emails and send replies
+n8n           → Run the entire automation
+OpenAI        → Read emails and write replies
+Google Sheets → Log every email and response
+```
+
+---
+
+## Full Workflow Flow
+
+```
+Someone sends an email to Gmail
+            ↓
+01 - Watch Incoming Email
+     Checks inbox every 1 minute
+     Fires when new email arrives
+            ↓
+02 - Extract Email Data
+     Pulls out sender name, sender email,
+     subject, and body cleanly
+            ↓
+03 - AI Read and Reply
+     Sends email data to GPT-4o-mini
+     AI reads it and writes a professional reply
+            ↓
+04 - Parse AI Response
+     Extracts reply and category from AI text
+     Combines everything into one clean output
+            ↓
+05 - Send Reply
+     Sends AI written reply back to sender via Gmail
+            ↓
+06 - Log to Sheet
+     Saves sender, subject, body, reply, timestamp
+     to Google Sheets for full tracking
+```
+
+---
+
+---
+
+# Episode 1 — Planning and Setup
+
+## What I Built First
+
+Before touching n8n I set up two things.
+
+## Google Sheet Setup
+```
+Go to sheets.google.com
+Create new spreadsheet
+Name it: Workflow 10 - Email Auto Responder
+
+Headers in Row 1:
+A1: Timestamp
+B1: Sender Name
+C1: Sender Email
+D1: Subject
+E1: Email Body
+F1: AI Reply
+G1: Status
+```
+
+## n8n Setup
+```
+Open n8n
+New Workflow
+Name it: Workflow 10 - AI Email Auto Responder
+```
+
+## Why I Planned First
+Experts never open n8n and start clicking randomly.
+I know what I am building before I build it.
+Sheet headers match exactly what the workflow will produce.
+No surprises. No rework.
+
+---
+
+---
+
+# Episode 2 — Node 01 — Watch Incoming Email
+
+## Node Info
+```
+Node Type : Gmail Trigger
+Node Name : 01 - Watch Incoming Email
+What it does: Watches the Gmail inbox every 1 minute
+              Fires the workflow when a new email arrives
+```
+
+## How I Built It
+```
+Click "+" on the canvas
+Search: Gmail
+Under Triggers section → select: On message received ⚡
+Rename: 01 - Watch Incoming Email
+```
+
+## Config Settings
+```
+Credential : My Gmail account
+Event      : Message Received
+Simplify   : ON
+Poll Times : Every 1 Minute
+```
+
+## How I Tested It
+```
+Clicked Fetch Test Event
+Gmail pulled in the most recent email
+Data appeared in the output ✅
+```
+
+## Why I Built It This Way
+This node is always watching.
+Even when I am asleep it checks every minute.
+The moment an email lands, the whole workflow fires.
+I used Fetch Test Event instead of sending a new email
+because it is faster and does not waste executions.
+
+## What the Output Contains
+```
+id           → Gmail message ID
+threadId     → Email thread ID
+snippet      → Preview text of the email
+subject      → Email subject line
+from         → Sender information
+internalDate → When the email was received
+labels       → Gmail labels on the email
+```
+
+---
+
+---
+
+# Episode 3 — Node 02 — Extract Email Data
+
+## Node Info
+```
+Node Type : Edit Fields (Set)
+Node Name : 02 - Extract Email Data
+What it does: Pulls sender name, sender email,
+              subject, and body into clean short fields
+```
+
+## How I Built It
+```
+Click "+" after Node 01
+Search: Edit Fields
+Select it
+Rename: 02 - Extract Email Data
+Mode: Manual Mapping
+```
+
+## The 4 Fields I Set Up
+
+```
+Field 1
+Name : sender_email
+Type : String
+Value: {{ $json.from.value[0].address }}
+
+Field 2
+Name : sender_name
+Type : String
+Value: {{ $json.from.value[0].name }}
+
+Field 3
+Name : subject
+Type : String
+Value: {{ $json.subject }}
+
+Field 4
+Name : body
+Type : String
+Value: {{ $json.snippet }}
+```
+
+## What the Output Looked Like
+```
+sender_email: "mostakinhossain0@gmail.com"
+sender_name : "mostakin hossain"
+subject     : "hello"
+body        : "i can buy food"
+```
+
+## Why I Built It This Way
+Gmail sends data in a nested structure.
+Writing $json.from.value[0].address every time is painful.
+I extract it once here and give it clean short names.
+Every node after this uses sender_email, sender_name, subject, body.
+Simple and clean.
+
+## Important Note About Body
+```
+$json.text sometimes comes back empty.
+Use $json.snippet instead.
+snippet is Gmail's preview text — always available.
+It gives enough context for AI to write a good reply.
+```
+
+---
+
+---
+
+# Episode 4 — Node 03 — AI Read and Reply
+
+## Node Info
+```
+Node Type : OpenAI
+Node Name : 03 - AI Read and Reply
+Model     : GPT-4o-mini
+Operation : Message a Model
+What it does: Reads the email content and writes
+              a professional reply automatically
+```
+
+## How I Built It
+```
+Click "+" after Node 02
+Search: OpenAI
+Select it
+Rename: 03 - AI Read and Reply
+Credential: OpenAI API Key
+Resource: Text
+Operation: Message a Model
+Model: GPT-4o-mini
+```
+
+## System Prompt I Used
+```
+You are a professional email assistant for a
+Digital Marketing Agency.
+
+Your job is to read incoming emails and write
+a professional, warm, and helpful reply.
+
+RULES:
+- Always greet the sender by their first name
+- Keep the reply short and clear
+- Sound human — not robotic
+- Always end with a call to action
+- Sign off as: "Best regards, Sarah — Digital Marketing Team"
+
+TYPES OF EMAILS YOU WILL HANDLE:
+
+1. PRICING QUESTION
+If they ask about price or cost, reply with:
+Our packages start from $500/month.
+We offer Social Media, Google Ads, and SEO packages.
+Book a free call to get a custom quote.
+
+2. SERVICE INQUIRY
+If they ask what services we offer, reply with:
+We offer Social Media Marketing, Google Ads,
+Facebook Ads, SEO, and Email Automation.
+Each package is customized to your business needs.
+
+3. MEETING REQUEST
+If they want to book a call or meeting, reply with:
+We would love to connect!
+Book a free 30-minute call here: [calendar-link]
+We are available Monday to Friday, 9am to 6pm.
+
+4. GENERAL EMAIL
+If it does not fit the above, write a warm
+professional reply that makes sense for the email.
+
+RESPONSE FORMAT:
+Return ONLY a valid JSON object. Nothing else.
+
+{
+  "reply": "<your full email reply here>",
+  "category": "<Pricing/Service/Meeting/General>"
+}
+```
+
+## User Message I Used
+```
+Sender Name : {{ $json.sender_name }}
+Sender Email: {{ $json.sender_email }}
+Subject     : {{ $json.subject }}
+Email Body  : {{ $json.body }}
+
+Write a professional reply to this email.
+```
+
+## What the Output Looked Like
+```
+{
+  "reply"   : "Hi Mostakin, Thank you for reaching out...",
+  "category": "General"
+}
+```
+
+## Why I Built It This Way
+I gave AI 4 types of emails with exact reply templates.
+This keeps replies consistent and on-brand every time.
+Return ONLY JSON means no extra text that breaks parsing.
+The category field lets me track what kind of emails come in.
+A client can filter the Sheet by category to see patterns.
+This is a real business intelligence feature — not just automation.
+
+---
+
+---
+
+# Episode 5 — Node 04 — Parse AI Response
+
+## Node Info
+```
+Node Type : Code Node
+Node Name : 04 - Parse AI Response
+Language  : JavaScript
+Mode      : Run Once for All Items
+What it does: Extracts reply and category from AI text
+              Combines everything into one clean output
+```
+
+## How I Built It
+```
+Click "+" after Node 03
+Search: Code
+Select it
+Rename: 04 - Parse AI Response
+Language: JavaScript
+Mode: Run Once for All Items
+```
+
+## Full Code
+```javascript
+const items = $input.all();
+const results = [];
+
+for (const item of items) {
+
+  // Get AI response text
+  // n8n 2026 OpenAI response path
+  const rawText = item.json.output[0].content[0].text;
+
+  // Parse JSON string into real object
+  const parsed = JSON.parse(rawText);
+
+  // Combine Node 02 data + AI output into one clean object
+  results.push({
+    json: {
+      sender_email: $('02 - Extract Email Data').item.json.sender_email,
+      sender_name : $('02 - Extract Email Data').item.json.sender_name,
+      subject     : $('02 - Extract Email Data').item.json.subject,
+      body        : $('02 - Extract Email Data').item.json.body,
+      reply       : parsed.reply,
+      category    : parsed.category
+    }
+  });
+}
+
+return results;
+```
+
+## What the Output Looked Like
+```
+sender_email: "mostakinhossain0@gmail.com"
+sender_name : "mostakin hossain"
+subject     : "hello"
+body        : "i can buy food"
+reply       : "Hi Mostakin, Thank you for reaching out..."
+category    : "General"
+```
+
+## Why I Built It This Way
+AI returns plain text — cannot use it directly.
+I parse it into a real object and pull out reply and category.
+I combine Node 02 data here so the next nodes have everything.
+One clean output. No jumping between nodes for data.
+Same pattern I used in Workflow 9 — once you know it, use it everywhere.
+
+## Critical Things That Must Be Right
+```
+OpenAI response path in n8n 2026:
+output[0].content[0].text ✅
+
+Old format that no longer works:
+message.content ❌
+
+Must reference Node 02 by name after any branching:
+$('02 - Extract Email Data').item.json.sender_email ✅
+$json.sender_email ❌
+```
+
+---
+
+---
+
+# Episode 6 — Node 05 — Send Reply
+
+## Node Info
+```
+Node Type : Gmail — Send Email
+Node Name : 05 - Send Reply
+What it does: Sends the AI written reply
+              back to whoever emailed us
+```
+
+## How I Built It
+```
+Click "+" after Node 04
+Search: Gmail
+Select it (Actions — NOT Trigger)
+Rename: 05 - Send Reply
+Credential: My Gmail account
+Operation: Send
+```
+
+## Email Config I Set Up
+```
+To      : {{ $json.sender_email }}
+Subject : Re: {{ $json.subject }}
+Message : {{ $json.reply }}
+```
+
+## Why I Built It This Way
+Re: in the subject line makes it look like a real human replied.
+People trust it more — feels personal and professional.
+The reply field already contains the full AI written email.
+Drop it in and send — no extra work needed.
+The whole thing happens in seconds.
+The sender has no idea it was written by AI.
+
+---
+
+---
+
+# Episode 7 — Node 06 — Log to Sheet
+
+## Node Info
+```
+Node Type : Google Sheets — Append Row
+Node Name : 06 - Log to Sheet
+What it does: Saves every email and AI reply
+              to Google Sheets for full tracking
+```
+
+## How I Built It
+```
+Click "+" after Node 05
+Search: Google Sheets
+Select it
+Rename: 06 - Log to Sheet
+Operation: Append Row
+Document: Workflow 10 - Email Auto Responder
+Sheet: Sheet1
+Mapping: Map Each Column Manually
+```
+
+## Column Mapping I Set Up
+```
+Timestamp    → {{ $now.toISO() }}
+Sender Name  → {{ $('04 - Parse AI Response').item.json.sender_name }}
+Sender Email → {{ $('04 - Parse AI Response').item.json.sender_email }}
+Subject      → {{ $('04 - Parse AI Response').item.json.subject }}
+Email Body   → {{ $('04 - Parse AI Response').item.json.body }}
+AI Reply     → {{ $('04 - Parse AI Response').item.json.reply }}
+Status       → Replied
+```
+
+## Why I Built It This Way
+This log is the most valuable thing for the client.
+Every email, every reply, every timestamp — all in one place.
+Nothing gets lost. Nothing gets forgotten.
+Status is hardcoded as Replied because by the time
+this node runs, the reply has already been sent.
+Client can filter by category, date, sender — full visibility.
+This is what turns a $200 setup into a $500 setup.
+
+---
+
+---
+
+# All Lessons I Learned
+
+```
+Lesson 1 — Gmail Trigger Location
+In n8n 2026, Gmail Trigger is under:
+Gmail → Triggers section → On message received ⚡
+Not in the main search as a separate node.
+
+Lesson 2 — Email Body Field
+$json.text sometimes returns empty.
+Use $json.snippet instead.
+snippet is always available — it is Gmail's preview text.
+
+Lesson 3 — Same OpenAI Path as Workflow 9
+output[0].content[0].text ✅
+This is the standard path for all OpenAI nodes in n8n 2026.
+Memorize it — use it in every workflow.
+
+Lesson 4 — Re: In Subject Line
+Putting Re: before the subject makes replies
+look like real human responses.
+Clients and their customers trust it more.
+Small detail — big impact.
+
+Lesson 5 — Category Field in AI Prompt
+Asking AI to return a category alongside the reply
+gives the client business intelligence for free.
+They can see which type of inquiry comes most often.
+This is a feature — not just a log.
+
+Lesson 6 — System Prompt Templates
+Giving AI exact reply templates for each email type
+keeps the brand voice consistent every single time.
+No two replies sound different.
+The client never has to worry about what AI will say.
+```
+
+---
+
+# AI System Prompt Reference
+
+```
+4 Email Categories:
+1. Pricing    → Packages start from $500/month
+2. Service    → List of services offered
+3. Meeting    → Calendar link + availability
+4. General    → Warm professional reply
+
+Response Format:
+{
+  "reply"   : "<full email reply>",
+  "category": "<Pricing/Service/Meeting/General>"
+}
+
+Sign off: Best regards, Sarah — Digital Marketing Team
+```
+
+---
+
+# Spreadsheet Info
+
+```
+Spreadsheet Name: Workflow 10 - Email Auto Responder
+
+Headers:
+A: Timestamp
+B: Sender Name
+C: Sender Email
+D: Subject
+E: Email Body
+F: AI Reply
+G: Status
+```
+
+---
+
+# Quick Node Reference
+
+```
+01 - Watch Incoming Email
+     Gmail Trigger — On message received
+     Poll: Every 1 Minute
+
+02 - Extract Email Data
+     Edit Fields (Set) — Manual Mapping
+     Fields: sender_email, sender_name, subject, body
+     Body uses: $json.snippet
+
+03 - AI Read and Reply
+     OpenAI — GPT-4o-mini
+     System Prompt with 4 email type templates
+     Returns JSON: reply + category
+
+04 - Parse AI Response
+     Code Node — JavaScript
+     Path: output[0].content[0].text
+     Combines Node 02 data + AI output
+
+05 - Send Reply
+     Gmail — Send Email
+     To: sender_email
+     Subject: Re: + subject
+     Body: AI reply
+
+06 - Log to Sheet
+     Google Sheets — Append Row
+     Logs everything + Status: Replied
+     Uses $('04 - Parse AI Response').item.json.xxx
+```
+
+---
+
+# Selling This as a Freelancer
+
+```
+Who needs this:
+Any business that gets repeated emails daily
+Digital Marketing Agencies
+Law Firms
+Real Estate Agents
+E-commerce Stores
+Coaches and Consultants
+
+How much to charge:
+One-time setup   : $300 to $600
+Monthly retainer : $75 to $150
+
+What to tell the client:
+Every email that comes into your inbox gets
+read and replied to by AI within 1 minute.
+Pricing questions, service inquiries, meeting requests
+— all handled automatically.
+You get a full log of every email and reply in a spreadsheet.
+You never miss an inquiry again.
+Your response time goes from hours to seconds.
+```
+
+---
+
+*Workflow 10 Complete ✅*
+*June 2026 — AI Automation Freelancer Training*
