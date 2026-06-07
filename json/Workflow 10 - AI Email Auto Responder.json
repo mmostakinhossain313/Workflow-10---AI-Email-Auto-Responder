@@ -1,0 +1,333 @@
+{
+  "name": "Workflow 10 - AI Email Auto Responder",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -352,
+        0
+      ],
+      "id": "679355bd-a187-4ddd-8d6e-22290203509d",
+      "name": "01 - Watch Incoming Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "avXEZrxeOKp5jA9m",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "62b08eaf-c969-4b30-8ed7-c24c2f6c417e",
+              "name": "sender_email",
+              "value": "={{ $json['from']['value'][0]['address'] }}",
+              "type": "string"
+            },
+            {
+              "id": "e0dcfe04-f89a-4886-b5e8-93bd2a10b29e",
+              "name": "sender_name",
+              "value": "={{ $json.from.value[0].name }}",
+              "type": "string"
+            },
+            {
+              "id": "af25988f-2d42-4419-ba82-b352e8dcb844",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "c54dabca-59fd-4f78-a1dd-3fe0da34a0d2",
+              "name": "body",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "fbc27d2b-aed8-4531-ba5c-b4d63234ca2a",
+      "name": "02 - Extract Email Data"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a professional email assistant for a \nDigital Marketing Agency.\n\nYour job is to read incoming emails and write \na professional, warm, and helpful reply.\n\nRULES:\n- Always greet the sender by their first name\n- Keep the reply short and clear\n- Sound human — not robotic\n- Always end with a call to action\n- Sign off as: \"Best regards, Sarah — Digital Marketing Team\"\n\nTYPES OF EMAILS YOU WILL HANDLE:\n\n1. PRICING QUESTION\nIf they ask about price or cost, reply with:\nOur packages start from $500/month.\nWe offer Social Media, Google Ads, and SEO packages.\nBook a free call to get a custom quote.\n\n2. SERVICE INQUIRY\nIf they ask what services we offer, reply with:\nWe offer Social Media Marketing, Google Ads,\nFacebook Ads, SEO, and Email Automation.\nEach package is customized to your business needs.\n\n3. MEETING REQUEST\nIf they want to book a call or meeting, reply with:\nWe would love to connect!\nBook a free 30-minute call here: [calendar-link]\nWe are available Monday to Friday, 9am to 6pm.\n\n4. GENERAL EMAIL\nIf it does not fit the above, write a warm\nprofessional reply that makes sense for the email.\n\nRESPONSE FORMAT:\nReturn ONLY a valid JSON object. Nothing else.\n\n{\n  \"reply\": \"<your full email reply here>\",\n  \"category\": \"<Pricing/Service/Meeting/General>\"\n}"
+            },
+            {
+              "content": "=Sender Name : {{ $json.sender_name }}\nSender Email: {{ $json.sender_email }}\nSubject     : {{ $json.subject }}\nEmail Body  : {{ $json.body }}\n\nWrite a professional reply to this email."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        0
+      ],
+      "id": "64bf9301-66e1-4d30-b736-629f4a550114",
+      "name": "03 - AI Read and Reply",
+      "credentials": {
+        "openAiApi": {
+          "id": "qkmcSIWhxRW61AM1",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  // Get AI response text\n  const rawText = item.json.output[0].content[0].text;\n\n  // Parse JSON\n  const parsed = JSON.parse(rawText);\n\n  results.push({\n    json: {\n      sender_email: $('02 - Extract Email Data').item.json.sender_email,\n      sender_name : $('02 - Extract Email Data').item.json.sender_name,\n      subject     : $('02 - Extract Email Data').item.json.subject,\n      body        : $('02 - Extract Email Data').item.json.body,\n      reply       : parsed.reply,\n      category    : parsed.category\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        0
+      ],
+      "id": "b3a6f902-df37-4048-8f69-336aa89fa9c0",
+      "name": "04 - Parse AI Response"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender_email }}",
+        "subject": "=Re: {{ $json.subject }}",
+        "message": "={{ $json.reply }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        0
+      ],
+      "id": "d2f3d6ec-502b-4aa7-8dd2-d7f72c58a23c",
+      "name": "05 - Send Reply",
+      "webhookId": "5486f635-392a-4da2-acf9-4d89cadda50b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "avXEZrxeOKp5jA9m",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "17soYtClrvaRN0ybtW7i8-GBri_JOxWst2AZ4JPKm0RU",
+          "mode": "list",
+          "cachedResultName": "Workflow 10 - Email Auto Responder",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17soYtClrvaRN0ybtW7i8-GBri_JOxWst2AZ4JPKm0RU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17soYtClrvaRN0ybtW7i8-GBri_JOxWst2AZ4JPKm0RU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "Sender Name": "={{ $('04 - Parse AI Response').item.json.sender_name }}",
+            "Sender Email": "={{ $('04 - Parse AI Response').item.json.sender_email }}",
+            "Subject": "={{ $('04 - Parse AI Response').item.json.subject }}",
+            "Email Body": "={{ $('04 - Parse AI Response').item.json.body }}",
+            "AI Reply": "={{ $('04 - Parse AI Response').item.json.reply }}",
+            "Status": "Replied"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sender Name",
+              "displayName": "Sender Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sender Email",
+              "displayName": "Sender Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Body",
+              "displayName": "Email Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Reply",
+              "displayName": "AI Reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "469131ce-d1f7-484c-8edf-991e88e6a51a",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Vvyaf4MtdtLlFXW1",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "01 - Watch Incoming Email": {
+      "main": [
+        [
+          {
+            "node": "02 - Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "03 - AI Read and Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - AI Read and Reply": {
+      "main": [
+        [
+          {
+            "node": "04 - Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "05 - Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Send Reply": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9a5e7933-235a-4d23-a6cf-7e54b720c9ae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f2f23a593b5262fad10e7ebf366e5500ddfd99f99fc69ff6bdb831511c19c666"
+  },
+  "id": "p38aqB6ayv9MotYW",
+  "tags": []
+}
